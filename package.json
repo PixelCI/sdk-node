@@ -5,6 +5,11 @@
   "main": "index.js",
   "repository": "http://github.com/browserci/javascript",
   "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "lint": "tslint --project tsconfig.json",
+    "test": "yarn lint && yarn build"
+  },
   "dependencies": {
     "node-fetch": "^2.1.1",
     "tslint": "^5.9.1",
