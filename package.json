@@ -1,0 +1,17 @@
+{
+  "name": "broserci-sdk",
+  "version": "1.0.0",
+  "description": "official browserci sdk",
+  "main": "index.js",
+  "repository": "http://github.com/browserci/javascript",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^2.1.1",
+    "tslint": "^5.9.1",
+    "typescript": "^2.7.2"
+  },
+  "devDependencies": {
+    "@itajaja/typescript": "^1.0.1",
+    "@types/node": "^9.4.7"
+  }
+}

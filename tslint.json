@@ -1,0 +1,3 @@
+{
+  "extends": "@itajaja/typescript/tslint.json"
+}
