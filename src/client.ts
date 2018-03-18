@@ -10,6 +10,7 @@ export default class Client {
       method: 'POST',
       body: JSON.stringify({ query }),
       headers: {
+        'Content-Type': 'application/json',
         Accept: 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
@@ -22,7 +23,7 @@ export default class Client {
 
     const { data, errors } = await resp.json()
     if (errors) {
-      throw new Error(`browserci API Error: \n${errors}`)
+      throw new Error(`browserci API Error: \n${JSON.stringify(errors)}`)
     }
 
     return data
