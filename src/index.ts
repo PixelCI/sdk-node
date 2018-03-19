@@ -43,16 +43,21 @@ export class SessionManager {
       throw new Error(`couldn't find project "${this.config.projectSlug}"`)
     }
 
-    const { openSession } = await this.client.request(`mutation {
-      openSession(input: {
-        projectId: "${project.id}"
-        clientId: "${this.config.sessionKey}"
-      }) {
-        testSession {
-          id
+    const { openSession } = await this.client.request(
+      `mutation($input: OpenSessionInput!) {
+        openSession(input: $input) {
+          testSession {
+            id
+          }
         }
-      }
-    }`)
+      }`,
+      {
+        input: {
+          projectId: project.id,
+          clientId: this.config.sessionKey,
+        },
+      },
+    )
 
     this.testSessionId = openSession.testSession.id
   }
@@ -63,13 +68,18 @@ export class SessionManager {
     try {
       await Promise.all(this.capturePromises)
     } finally {
-      await this.client.request(`mutation {
-        closeSession(input: {
-          id: "${this.testSessionId}"
-        }) {
-          __typename
-        }
-      }`)
+      await this.client.request(
+        `mutation($input: CloseSessionInput!) {
+          closeSession(input: $input) {
+            __typename
+          }
+        }`,
+        {
+          input: {
+            id: this.testSessionId,
+          },
+        },
+      )
     }
   }
 
@@ -86,18 +96,23 @@ export class SessionManager {
     tags = { ...this.config.tags, ...tags }
 
     this.capturePromises.push(
-      this.client.request(`mutation {
-        createImageCheck(input: {
-          testSessionId: "${this.testSessionId}"
-          data: "${imageData.toString('base64')}"
-          name: "${name}"
-          tags: ${JSON.stringify(tags)}
-        }) {
-          imageCheck {
-            name
+      this.client.request(
+        `mutation($input: CreateImageCheckInput!) {
+          createImageCheck(input: $input) {
+            imageCheck {
+              name
+            }
           }
-        }
-      }`),
+        }`,
+        {
+          input: {
+            testSessionId: this.testSessionId,
+            data: imageData.toString('base64'),
+            name,
+            tags,
+          },
+        },
+      ),
     )
   }
 }
