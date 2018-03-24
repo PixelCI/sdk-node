@@ -1,6 +1,6 @@
 {
   "name": "@browserci/sdk",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "official browserci sdk",
   "main": "lib/index.js",
   "repository": "http://github.com/browserci/javascript",
