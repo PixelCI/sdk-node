@@ -2,7 +2,7 @@ import * as t from 'io-ts'
 // tslint:disable-next-line:no-implicit-dependencies
 import { WebDriver } from 'selenium-webdriver'
 import Client from './client'
-import { validateArgs } from './utils'
+import { gql, validateArgs } from './utils'
 
 export const TagsType = t.dictionary(t.string, t.string)
 export type Tags = t.TypeOf<typeof TagsType>
@@ -10,7 +10,6 @@ export type Tags = t.TypeOf<typeof TagsType>
 export const SessionManagerConfigType = t.interface({
   apiKey: t.string,
   projectSlug: t.string,
-  sessionKey: t.union([t.string, t.undefined]),
   tags: t.union([TagsType, t.undefined]),
 })
 export type SessionManagerConfig = t.TypeOf<typeof SessionManagerConfigType>
@@ -30,31 +29,35 @@ export class SessionManager {
 
   async open() {
     const [tenantSlug, projectSlug] = this.config.projectSlug.split('/')
-    const { project } = await this.client.request(`query {
-      project: projectBySlug(
-        tenantSlug: "${tenantSlug}"
-        projectSlug: "${projectSlug}"
-      ) {
-        id
-      }
-    }`)
+    const { project } = await this.client.request(
+      gql`
+        query($tenantSlug: String!, $projectSlug: String!) {
+          project: projectBySlug(tenantSlug: $tenantSlug, projectSlug: $projectSlug) {
+            id
+          }
+        }
+      `,
+      { tenantSlug, projectSlug },
+    )
 
     if (!project) {
       throw new Error(`couldn't find project "${this.config.projectSlug}"`)
     }
 
     const { openSession } = await this.client.request(
-      `mutation($input: OpenSessionInput!) {
-        openSession(input: $input) {
-          testSession {
-            id
+      gql`
+        mutation($input: OpenSessionInput!) {
+          openSession(input: $input) {
+            testSession {
+              id
+            }
           }
         }
-      }`,
+      `,
       {
         input: {
           projectId: project.id,
-          clientId: this.config.sessionKey,
+          tags: this.config.tags || {},
         },
       },
     )
@@ -69,11 +72,13 @@ export class SessionManager {
       await Promise.all(this.capturePromises)
     } finally {
       await this.client.request(
-        `mutation($input: CloseSessionInput!) {
-          closeSession(input: $input) {
-            __typename
+        gql`
+          mutation($input: CloseSessionInput!) {
+            closeSession(input: $input) {
+              __typename
+            }
           }
-        }`,
+        `,
         {
           input: {
             id: this.testSessionId,
@@ -83,33 +88,31 @@ export class SessionManager {
     }
   }
 
-  createCheck(imageData: Buffer, name: string, tags?: Tags) {
+  createCheck(imageData: Buffer, name: string) {
     validateArgs({
       imageData: [t.object, imageData],
       name: [t.string, name],
-      tags: [t.union([TagsType, t.undefined]), tags],
     })
 
     t.string.decode(name)
     if (!this.testSessionId) throw new Error('`.open` must be called first')
 
-    tags = { ...this.config.tags, ...tags }
-
     this.capturePromises.push(
       this.client.request(
-        `mutation($input: CreateImageCheckInput!) {
-          createImageCheck(input: $input) {
-            imageCheck {
-              name
+        gql`
+          mutation($input: CreateImageCheckInput!) {
+            createImageCheck(input: $input) {
+              imageCheck {
+                name
+              }
             }
           }
-        }`,
+        `,
         {
           input: {
             testSessionId: this.testSessionId,
             data: imageData.toString('base64'),
             name,
-            tags,
           },
         },
       ),
@@ -119,7 +122,6 @@ export class SessionManager {
 
 export class SeleniumSessionManager extends SessionManager {
   private browser: WebDriver
-  private seleniumTags: Tags
 
   constructor({ browser, ...config }: SessionManagerConfig & { browser: any }) {
     super(config)
@@ -130,28 +132,27 @@ export class SeleniumSessionManager extends SessionManager {
   }
 
   async getSeleniumTags(): Promise<Tags> {
-    if (this.seleniumTags) return this.seleniumTags
-
     const capabilities = await this.browser.getCapabilities()
-    this.seleniumTags = {
+    return {
       browser: capabilities.get('browserName'),
       platform: capabilities.get('platform'),
     }
-
-    return this.seleniumTags
   }
 
-  async capture(name: string, tags?: Tags) {
+  async open() {
+    this.config.tags = {
+      ...(await this.getSeleniumTags()),
+      ...this.config.tags,
+    }
+    await super.open()
+  }
+
+  async capture(name: string) {
     validateArgs({
       name: [t.string, name],
-      tags: [t.union([TagsType, t.undefined]), tags],
     })
 
     const imageData = await this.browser.takeScreenshot()
-    tags = {
-      ...(await this.getSeleniumTags()),
-      ...tags,
-    }
-    this.createCheck(new Buffer(imageData, 'base64'), name, tags)
+    this.createCheck(new Buffer(imageData, 'base64'), name)
   }
 }

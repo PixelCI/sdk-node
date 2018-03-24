@@ -14,3 +14,8 @@ export function validateArgs(args: { [idx: string]: ValidateEntry }) {
     }
   })
 }
+
+// just a stupid utility function for prettier indentation
+export function gql(strings) {
+  return strings[0]
+}
