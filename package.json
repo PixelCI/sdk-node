@@ -1,9 +1,9 @@
 {
-  "name": "@browserci/sdk",
+  "name": "@pixelci/sdk",
   "version": "1.1.0",
-  "description": "official browserci sdk",
+  "description": "official PixelCI sdk",
   "main": "lib/index.js",
-  "repository": "http://github.com/browserci/javascript",
+  "repository": "http://github.com/pixelci/sdk-node",
   "license": "MIT",
   "scripts": {
     "build": "tsc",

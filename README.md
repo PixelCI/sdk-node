@@ -1,2 +1,3 @@
-# javascript
-official browserci javascript sdk
+# sdk-node
+
+official PixelCI node sdk
