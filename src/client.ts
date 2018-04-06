@@ -1,6 +1,6 @@
 import * as fetch from 'node-fetch'
 
-const API_URL = 'https://broserci.io/graphql'
+const API_URL = 'https://pixelci.io/graphql'
 
 export default class Client {
   constructor(private apiKey: string) {}
@@ -18,12 +18,12 @@ export default class Client {
 
     if (!resp.ok) {
       const text = await resp.text()
-      throw new Error(`browserci API Error: \n${text}`)
+      throw new Error(`PixelCI API Error: \n${text}`)
     }
 
     const { data, errors } = await resp.json()
     if (errors) {
-      throw new Error(`browserci API Error: \n${JSON.stringify(errors)}`)
+      throw new Error(`PixelCI API Error: \n${JSON.stringify(errors)}`)
     }
 
     return data
