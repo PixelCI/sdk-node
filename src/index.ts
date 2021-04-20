@@ -1,47 +1,53 @@
-import * as t from 'io-ts'
-// tslint:disable-next-line:no-implicit-dependencies
-import { WebDriver } from 'selenium-webdriver'
-import Client from './client'
-import { gql, validateArgs } from './utils'
+// eslint-disable-next-line max-classes-per-file
+import * as t from 'io-ts';
+import { WebDriver } from 'selenium-webdriver';
 
-export const TagsType = t.dictionary(t.string, t.string)
-export type Tags = t.TypeOf<typeof TagsType>
+import Client from './client';
+import { gql, validateArgs } from './utils';
+
+export const TagsType = t.dictionary(t.string, t.string);
+export type Tags = t.TypeOf<typeof TagsType>;
 
 export const SessionManagerConfigType = t.interface({
   apiKey: t.string,
   projectSlug: t.string,
   tags: t.union([TagsType, t.undefined]),
-})
-export type SessionManagerConfig = t.TypeOf<typeof SessionManagerConfigType>
+});
+export type SessionManagerConfig = t.TypeOf<typeof SessionManagerConfigType>;
 
 export class SessionManager {
-  protected client: Client
-  protected testSessionId: string
-  protected capturePromises: Array<Promise<any>> = []
+  protected client: Client;
+
+  protected testSessionId: string | undefined;
+
+  protected capturePromises: Array<Promise<any>> = [];
 
   constructor(protected config: SessionManagerConfig) {
     validateArgs({
       config: [SessionManagerConfigType, config],
-    })
+    });
 
-    this.client = new Client(config.apiKey)
+    this.client = new Client(config.apiKey);
   }
 
   async open() {
-    const [tenantSlug, projectSlug] = this.config.projectSlug.split('/')
+    const [tenantSlug, projectSlug] = this.config.projectSlug.split('/');
     const { project } = await this.client.request(
       gql`
         query($tenantSlug: String!, $projectSlug: String!) {
-          project: projectBySlug(tenantSlug: $tenantSlug, projectSlug: $projectSlug) {
+          project: projectBySlug(
+            tenantSlug: $tenantSlug
+            projectSlug: $projectSlug
+          ) {
             id
           }
         }
       `,
       { tenantSlug, projectSlug },
-    )
+    );
 
     if (!project) {
-      throw new Error(`couldn't find project "${this.config.projectSlug}"`)
+      throw new Error(`couldn't find project "${this.config.projectSlug}"`);
     }
 
     const { openSession } = await this.client.request(
@@ -60,16 +66,16 @@ export class SessionManager {
           tags: this.config.tags || {},
         },
       },
-    )
+    );
 
-    this.testSessionId = openSession.testSession.id
+    this.testSessionId = openSession.testSession.id;
   }
 
   async close() {
-    if (!this.testSessionId) return
+    if (!this.testSessionId) return;
 
     try {
-      await Promise.all(this.capturePromises)
+      await Promise.all(this.capturePromises);
     } finally {
       await this.client.request(
         gql`
@@ -84,7 +90,7 @@ export class SessionManager {
             id: this.testSessionId,
           },
         },
-      )
+      );
     }
   }
 
@@ -92,10 +98,10 @@ export class SessionManager {
     validateArgs({
       imageData: [t.object, imageData],
       name: [t.string, name],
-    })
+    });
 
-    t.string.decode(name)
-    if (!this.testSessionId) throw new Error('`.open` must be called first')
+    t.string.decode(name);
+    if (!this.testSessionId) throw new Error('`.open` must be called first');
 
     this.capturePromises.push(
       this.client.request(
@@ -116,43 +122,46 @@ export class SessionManager {
           },
         },
       ),
-    )
+    );
   }
 }
 
 export class SeleniumSessionManager extends SessionManager {
-  private browser: WebDriver
+  private browser: WebDriver;
 
-  constructor({ browser, ...config }: SessionManagerConfig & { browser: any }) {
-    super(config)
+  constructor({
+    browser,
+    ...config
+  }: SessionManagerConfig & { browser: any }) {
+    super(config);
     validateArgs({
       browser: [t.object, browser],
-    })
-    this.browser = browser
+    });
+    this.browser = browser;
   }
 
   async getSeleniumTags(): Promise<Tags> {
-    const capabilities = await this.browser.getCapabilities()
+    const capabilities = await this.browser.getCapabilities();
     return {
       browser: capabilities.get('browserName'),
       platform: capabilities.get('platform'),
-    }
+    };
   }
 
   async open() {
     this.config.tags = {
       ...(await this.getSeleniumTags()),
       ...this.config.tags,
-    }
-    await super.open()
+    };
+    await super.open();
   }
 
   async capture(name: string) {
     validateArgs({
       name: [t.string, name],
-    })
+    });
 
-    const imageData = await this.browser.takeScreenshot()
-    this.createCheck(new Buffer(imageData, 'base64'), name)
+    const imageData = await this.browser.takeScreenshot();
+    this.createCheck(Buffer.from(imageData, 'base64'), name);
   }
 }
