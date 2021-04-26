@@ -1,6 +1,9 @@
-import * as fetch from 'isomorphic-fetch';
+import type _fetch from 'isomorphic-fetch';
+import 'isomorphic-fetch';
 
 const API_URL = 'https://app.pixelci.io/graphql';
+
+declare const fetch: typeof _fetch;
 
 export default class Client {
   constructor(private apiKey: string) {}
