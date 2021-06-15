@@ -3,6 +3,7 @@ import * as t from 'io-ts';
 import { WebDriver } from 'selenium-webdriver';
 
 import Client from './client';
+import { getEnvConfig } from './envConfig';
 import { gql, validateArgs } from './utils';
 
 export const TagsType = t.dictionary(t.string, t.string);
@@ -10,9 +11,19 @@ export type Tags = t.TypeOf<typeof TagsType>;
 
 export const SessionManagerConfigType = t.interface({
   apiKey: t.string,
-  projectSlug: t.string,
+  projectHandle: t.string,
   tags: t.union([TagsType, t.undefined]),
+  clientId: t.string,
+  gitInfo: t.union([
+    t.interface({
+      commitSha: t.string,
+      branch: t.string,
+      pullRequestNumber: t.union([t.string, t.undefined]),
+    }),
+    t.undefined,
+  ]),
 });
+
 export type SessionManagerConfig = t.TypeOf<typeof SessionManagerConfigType>;
 
 export class SessionManager {
@@ -22,16 +33,41 @@ export class SessionManager {
 
   protected capturePromises: Array<Promise<any>> = [];
 
-  constructor(protected config: SessionManagerConfig) {
-    validateArgs({
-      config: [SessionManagerConfigType, config],
-    });
+  config: SessionManagerConfig;
 
+  constructor(config: SessionManagerConfig) {
+    this.config = this.loadOptions(config);
     this.client = new Client(config.apiKey);
   }
 
+  loadOptions(opts: Partial<SessionManagerConfig>) {
+    const envConfig = getEnvConfig();
+
+    const computedOptions: Partial<SessionManagerConfig> = {
+      apiKey: opts.apiKey || envConfig.apiKey,
+      clientId: opts.clientId || envConfig.clientSessionId,
+      projectHandle: opts.projectHandle || envConfig.projectHandle,
+      gitInfo:
+        opts.gitInfo ||
+        (envConfig.commitSha && envConfig.branch
+          ? {
+              branch: envConfig.branch,
+              commitSha: envConfig.commitSha,
+              pullRequestNumber: envConfig.pullRequestNumber,
+            }
+          : undefined),
+      tags: opts.tags,
+    };
+
+    validateArgs({
+      config: [SessionManagerConfigType, computedOptions],
+    });
+
+    return (computedOptions as unknown) as SessionManagerConfig;
+  }
+
   async open() {
-    const [tenantSlug, projectSlug] = this.config.projectSlug.split('/');
+    const [tenantSlug, projectSlug] = this.config.projectHandle.split('/');
     const { project } = await this.client.request(
       gql`
         query($tenantSlug: String!, $projectSlug: String!) {
@@ -47,7 +83,7 @@ export class SessionManager {
     );
 
     if (!project) {
-      throw new Error(`couldn't find project "${this.config.projectSlug}"`);
+      throw new Error(`couldn't find project "${this.config.projectHandle}"`);
     }
 
     const { openSession } = await this.client.request(
@@ -64,6 +100,8 @@ export class SessionManager {
         input: {
           projectId: project.id,
           tags: this.config.tags || {},
+          clientId: this.config.clientId,
+          gitInfo: this.config.gitInfo,
         },
       },
     );
@@ -72,26 +110,8 @@ export class SessionManager {
   }
 
   async close() {
-    if (!this.testSessionId) return;
-
-    try {
-      await Promise.all(this.capturePromises);
-    } finally {
-      await this.client.request(
-        gql`
-          mutation($input: CloseSessionInput!) {
-            closeSession(input: $input) {
-              __typename
-            }
-          }
-        `,
-        {
-          input: {
-            id: this.testSessionId,
-          },
-        },
-      );
-    }
+    await Promise.all(this.capturePromises);
+    this.capturePromises = [];
   }
 
   createCheck(imageData: Buffer, name: string) {
@@ -100,7 +120,6 @@ export class SessionManager {
       name: [t.string, name],
     });
 
-    t.string.decode(name);
     if (!this.testSessionId) throw new Error('`.open` must be called first');
 
     this.capturePromises.push(
