@@ -13,7 +13,7 @@ export const SessionManagerConfigType = t.interface({
   apiKey: t.string,
   projectHandle: t.string,
   tags: t.union([TagsType, t.undefined]),
-  clientId: t.string,
+  clientId: t.union([t.string, t.undefined]),
   gitInfo: t.union([
     t.interface({
       commitSha: t.string,
