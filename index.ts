@@ -35,9 +35,9 @@ export class SessionManager {
 
   config: SessionManagerConfig;
 
-  constructor(config: SessionManagerConfig) {
+  constructor(config: Partial<SessionManagerConfig>) {
     this.config = this.loadOptions(config);
-    this.client = new Client(config.apiKey);
+    this.client = new Client(this.config.apiKey);
   }
 
   loadOptions(opts: Partial<SessionManagerConfig>) {
